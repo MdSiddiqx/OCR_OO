@@ -99,7 +99,7 @@ html, body {
 }
 
 /* ═══════════════════════════════════════════════
-   TOOLBAR  (full-width bar below topbar)
+   TOOLBAR
 ═══════════════════════════════════════════════ */
 
 .toolbar {
@@ -111,7 +111,6 @@ html, body {
   border-bottom: 1px solid var(--border);
 }
 
-/* drop zone — leftmost cell */
 .toolbar-left {
   flex-shrink: 0;
   border-right: 1px solid var(--border);
@@ -165,7 +164,6 @@ html, body {
   margin-left: 2px;
 }
 
-/* file chips queue — scrollable middle section */
 .toolbar-queue {
   flex: 1;
   display: flex;
@@ -239,7 +237,6 @@ html, body {
 }
 .chip-rm:hover { color: var(--danger); }
 
-/* action buttons — right side */
 .toolbar-right {
   display: flex;
   align-items: center;
@@ -299,7 +296,7 @@ html, body {
 .btn-run:disabled { opacity: 0.35; cursor: not-allowed; }
 
 /* ═══════════════════════════════════════════════
-   COUNTERS  (stats strip after a successful run)
+   COUNTERS
 ═══════════════════════════════════════════════ */
 
 .counters {
@@ -373,12 +370,14 @@ html, body {
 .output-wrap::-webkit-scrollbar { width: 5px; }
 .output-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
-/* idle state */
+/* ── idle ── */
 .state-idle {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
+  gap: 20px;
   min-height: 50vh;
+  justify-content: center;
 }
 
 .idle-grid {
@@ -420,7 +419,78 @@ html, body {
   line-height: 1.5;
 }
 
-/* result blocks */
+/* ═══════════════════════════════════════════════
+   PROMPT BAR
+═══════════════════════════════════════════════ */
+
+.prompt-bar {
+  width: 100%;
+  max-width: 640px;
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.prompt-bar-results {
+  max-width: 100%;
+  margin-top: 24px;
+}
+
+.prompt-bar-label {
+  padding: 8px 14px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-3);
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.prompt-bar-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+}
+
+.prompt-preview {
+  flex: 1;
+  padding: 10px 14px;
+  font-size: 11px;
+  font-family: var(--mono);
+  color: var(--text-3);
+  line-height: 1.6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-right: 1px solid var(--border-soft);
+  background: var(--surface);
+  cursor: default;
+  user-select: none;
+}
+
+.btn-copy-prompt {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  padding: 0 18px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: var(--accent);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  white-space: nowrap;
+}
+
+.btn-copy-prompt:hover {
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+/* ── result blocks ── */
 .output-area {
   display: flex;
   flex-direction: column;
@@ -471,7 +541,7 @@ html, body {
 }
 
 .text-out {
-  padding: 20px 20px;
+  padding: 20px;
   font-family: var(--mono);
   font-size: 13px;
   line-height: 1.85;
@@ -490,7 +560,7 @@ html, body {
   font-size: 13px;
 }
 
-/* error */
+/* ── error ── */
 .error-box {
   display: flex;
   align-items: flex-start;
@@ -518,7 +588,7 @@ html, body {
 }
 
 /* ═══════════════════════════════════════════════
-   STATUS BAR  (bottom)
+   STATUS BAR
 ═══════════════════════════════════════════════ */
 
 .statusbar {
