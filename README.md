@@ -4,12 +4,6 @@ Batch OCR using Google Lens. Drop images or PDFs in, get clean plain text out. N
 
 Uses [`chrome-lens-py`](https://github.com/bropines/chrome-lens-py) to talk directly to the same Protobuf endpoint the Chrome browser extension uses.
 
-![Python](https://img.shields.io/badge/python-3.10%2B-blue)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.111-green)
-![License](https://img.shields.io/badge/license-MIT-lightgrey)
-
----
-
 ## Features
 
 - Drag-and-drop or click-to-add — images and PDFs in the same batch
