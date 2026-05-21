@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ocr_oo</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <span class="logo">OCR_OO</span>
+    <span class="logo-sub">/ google lens batch processor</span>
+  </div>
+  <div class="topbar-right">
+    <span class="status-dot" id="statusDot"></span>
+    <span class="status-label" id="statusLabel">idle</span>
+  </div>
+</div>
+
+<div class="toolbar">
+  <div class="toolbar-left">
+    <div class="drop-zone" id="dropZone">
+      <input type="file" id="fileInput" multiple accept=".png,.jpg,.jpeg,.webp,.bmp,.tiff,.tif,.pdf" />
+      <span class="dz-icon">+</span>
+      <span class="dz-text">drop files or click to add</span>
+      <span class="dz-formats">PNG · JPG · WEBP · BMP · TIFF · PDF</span>
+    </div>
+  </div>
+
+  <div class="toolbar-queue" id="fileQueue">
+    <span class="queue-empty" id="queueEmpty">no files queued</span>
+  </div>
+
+  <div class="toolbar-right">
+    <button class="btn-action" id="btnCopy" disabled title="Copy all text">copy</button>
+    <button class="btn-action" id="btnSave" disabled title="Save as .txt">save .txt</button>
+    <button class="btn-action btn-ghost" id="btnClear" disabled title="Clear output">clear</button>
+    <button class="btn-run" id="btnRun" disabled>run ocr</button>
+  </div>
+</div>
+
+<div class="counters" id="counters" style="display:none">
+  <div class="counter-item">
+    <span class="counter-val" id="ctrFiles">0</span>
+    <span class="counter-lbl">files</span>
+  </div>
+  <div class="counter-sep">/</div>
+  <div class="counter-item">
+    <span class="counter-val" id="ctrPages">0</span>
+    <span class="counter-lbl">pages</span>
+  </div>
+  <div class="counter-sep">/</div>
+  <div class="counter-item">
+    <span class="counter-val" id="ctrWords">0</span>
+    <span class="counter-lbl">words</span>
+  </div>
+  <div class="counter-sep">/</div>
+  <div class="counter-item">
+    <span class="counter-val" id="ctrChars">0</span>
+    <span class="counter-lbl">chars</span>
+  </div>
+</div>
+
+<div class="progress-strip" id="progressStrip" style="display:none">
+  <div class="progress-fill" id="progressFill"></div>
+</div>
+
+<main class="output-wrap" id="outputWrap">
+  <div class="state-idle" id="stateIdle">
+    <div class="idle-grid">
+      <div class="idle-step"><span class="idle-num">01</span><span class="idle-txt">drop images or PDFs into the add bar above</span></div>
+      <div class="idle-step"><span class="idle-num">02</span><span class="idle-txt">press run ocr — batches process in parallel</span></div>
+      <div class="idle-step"><span class="idle-num">03</span><span class="idle-txt">copy or save the extracted plain text</span></div>
+    </div>
+  </div>
+
+  <div class="output-area" id="outputArea" style="display:none"></div>
+</main>
+
+<div class="statusbar">
+  <span id="sbLeft">ready</span>
+  <span id="sbRight">localhost:8000</span>
+</div>
+
+<script>
+const API = 'http://localhost:8000';
+
+let pendingFiles = [];
+let allText = '';
+
+const dropZone    = document.getElementById('dropZone');
+const fileInput   = document.getElementById('fileInput');
+const fileQueue   = document.getElementById('fileQueue');
+const queueEmpty  = document.getElementById('queueEmpty');
+const btnRun      = document.getElementById('btnRun');
+const btnCopy     = document.getElementById('btnCopy');
+const btnSave     = document.getElementById('btnSave');
+const btnClear    = document.getElementById('btnClear');
+const outputArea  = document.getElementById('outputArea');
+const stateIdle   = document.getElementById('stateIdle');
+const counters    = document.getElementById('counters');
+const progressStrip = document.getElementById('progressStrip');
+const progressFill  = document.getElementById('progressFill');
+const statusDot   = document.getElementById('statusDot');
+const statusLabel = document.getElementById('statusLabel');
+const sbLeft      = document.getElementById('sbLeft');
+const sbRight     = document.getElementById('sbRight');
+
+// ── status ─────────────────────────────────────────────
+function setStatus(state, msg) {
+  statusDot.className = 'status-dot status-' + state;
+  statusLabel.textContent = state;
+  sbLeft.textContent = msg || state;
+}
+
+// ── file staging ────────────────────────────────────────
+function formatBytes(n) {
+  if (n < 1024) return n + 'B';
+  if (n < 1048576) return (n / 1024).toFixed(1) + 'KB';
+  return (n / 1048576).toFixed(1) + 'MB';
+}
+
+function renderQueue() {
+  const chips = fileQueue.querySelectorAll('.file-chip');
+  chips.forEach(c => c.remove());
+
+  if (pendingFiles.length === 0) {
+    queueEmpty.style.display = '';
+    btnRun.disabled = true;
+    return;
+  }
+
+  queueEmpty.style.display = 'none';
+  btnRun.disabled = false;
+
+  pendingFiles.forEach((f, i) => {
+    const chip = document.createElement('div');
+    chip.className = 'file-chip';
+    const isPdf = f.name.toLowerCase().endsWith('.pdf');
+    chip.innerHTML =
+      `<span class="chip-type">${isPdf ? 'PDF' : 'IMG'}</span>` +
+      `<span class="chip-name" title="${escHtml(f.name)}">${escHtml(f.name)}</span>` +
+      `<span class="chip-size">${formatBytes(f.size)}</span>` +
+      `<button class="chip-rm" data-i="${i}" aria-label="remove">×</button>`;
+    fileQueue.insertBefore(chip, queueEmpty);
+  });
+
+  fileQueue.querySelectorAll('.chip-rm').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      pendingFiles.splice(+btn.dataset.i, 1);
+      renderQueue();
+    });
+  });
+}
+
+function addFiles(arr) {
+  Array.from(arr).forEach(f => pendingFiles.push(f));
+  renderQueue();
+}
+
+fileInput.addEventListener('change', () => { addFiles(fileInput.files); fileInput.value = ''; });
+dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('dz-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dz-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dz-over');
+  addFiles(e.dataTransfer.files);
+});
+
+// ── progress ────────────────────────────────────────────
+function setProgress(pct) {
+  progressStrip.style.display = '';
+  progressFill.style.width = pct + '%';
+}
+function hideProgress() {
+  progressStrip.style.display = 'none';
+  progressFill.style.width = '0%';
+}
+
+// ── run ─────────────────────────────────────────────────
+btnRun.addEventListener('click', runOCR);
+
+async function runOCR() {
+  if (!pendingFiles.length) return;
+  btnRun.disabled = true;
+  allText = '';
+  setOutputBtns(false);
+  setStatus('busy', 'uploading files…');
+  setProgress(5);
+  showOutputArea(false);
+
+  const files = [...pendingFiles];
+  pendingFiles = [];
+  renderQueue();
+
+  const form = new FormData();
+  files.forEach(f => form.append('files', f));
+
+  let jobId;
+  try {
+    const res = await fetch(`${API}/ocr`, { method: 'POST', body: form });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(err.detail || res.statusText);
+    }
+    jobId = (await res.json()).job_id;
+  } catch (e) {
+    showError(e.message);
+    return;
+  }
+
+  setProgress(15);
+  setStatus('busy', 'processing…');
+  await pollJob(jobId);
+}
+
+async function pollJob(jobId) {
+  let tick = 0;
+  while (true) {
+    await sleep(900);
+    let data;
+    try {
+      const res = await fetch(`${API}/ocr/${jobId}`);
+      data = await res.json();
+    } catch (e) {
+      showError('polling error: ' + e.message);
+      return;
+    }
+
+    if (data.status === 'done')  { showResults(data); return; }
+    if (data.status === 'error') { showError(data.error || 'unknown error'); return; }
+
+    tick++;
+    const pct = data.status === 'queued' ? 15 : Math.min(88, 20 + tick * 8);
+    setProgress(pct);
+    sbLeft.textContent = 'processing… ' + (pct) + '%';
+  }
+}
+
+// ── results ─────────────────────────────────────────────
+function showResults(jobData) {
+  hideProgress();
+  setStatus('ok', 'done');
+
+  outputArea.innerHTML = '';
+  showOutputArea(true);
+
+  const results = jobData.results || [];
+  if (!results.length) {
+    outputArea.innerHTML = '<div class="no-result">no text detected in any file</div>';
+    return;
+  }
+
+  const lines = [];
+  let totalWords = 0, totalChars = 0, totalPages = 0;
+
+  for (const fr of results) {
+    const block = document.createElement('div');
+    block.className = 'result-block';
+
+    const pageCount = fr.pages?.length || 0;
+    totalPages += pageCount;
+
+    const hdr = document.createElement('div');
+    hdr.className = 'result-hdr';
+    hdr.innerHTML =
+      `<span class="result-fname">${escHtml(fr.filename)}</span>` +
+      `<span class="result-meta">${pageCount} page${pageCount !== 1 ? 's' : ''}</span>`;
+    block.appendChild(hdr);
+
+    lines.push('=== ' + fr.filename + ' ===');
+
+    for (const pg of (fr.pages || [])) {
+      const text = pg.ocr?.full_text || '';
+      totalWords += text.split(/\s+/).filter(Boolean).length;
+      totalChars += text.length;
+
+      if (pageCount > 1) {
+        const plbl = document.createElement('div');
+        plbl.className = 'page-lbl';
+        plbl.textContent = 'page ' + pg.page;
+        block.appendChild(plbl);
+        lines.push('--- page ' + pg.page + ' ---');
+      }
+
+      const pre = document.createElement('pre');
+      pre.className = 'text-out';
+      pre.textContent = text || '(no text detected)';
+      block.appendChild(pre);
+      lines.push(text, '');
+    }
+
+    outputArea.appendChild(block);
+  }
+
+  allText = lines.join('\n').trim();
+  setOutputBtns(true);
+
+  document.getElementById('ctrFiles').textContent  = results.length;
+  document.getElementById('ctrPages').textContent  = totalPages;
+  document.getElementById('ctrWords').textContent  = totalWords.toLocaleString();
+  document.getElementById('ctrChars').textContent  = totalChars.toLocaleString();
+  counters.style.display = '';
+  sbRight.textContent = results.length + ' file' + (results.length !== 1 ? 's' : '') + ' processed';
+}
+
+// ── actions ─────────────────────────────────────────────
+btnCopy.addEventListener('click', () => {
+  navigator.clipboard.writeText(allText).then(() => {
+    btnCopy.textContent = 'copied!';
+    setTimeout(() => { btnCopy.textContent = 'copy'; }, 1600);
+  });
+});
+
+btnSave.addEventListener('click', () => {
+  const blob = new Blob([allText], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'ocr_output_' + Date.now() + '.txt';
+  a.click();
+});
+
+btnClear.addEventListener('click', () => {
+  allText = '';
+  setOutputBtns(false);
+  showOutputArea(false);
+  counters.style.display = 'none';
+  setStatus('idle', 'ready');
+  sbRight.textContent = 'localhost:8000';
+  hideProgress();
+});
+
+function setOutputBtns(on) {
+  btnCopy.disabled = !on;
+  btnSave.disabled = !on;
+  btnClear.disabled = !on;
+}
+
+function showOutputArea(on) {
+  outputArea.style.display  = on ? '' : 'none';
+  stateIdle.style.display   = on ? 'none' : '';
+}
+
+function showError(msg) {
+  hideProgress();
+  setStatus('error', 'error');
+  outputArea.innerHTML = `<div class="error-box"><span class="err-prefix">ERR</span>${escHtml(msg)}</div>`;
+  showOutputArea(true);
+  btnRun.disabled = false;
+  renderQueue();
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+setStatus('idle', 'ready');
+</script>
+</body>
+</html>

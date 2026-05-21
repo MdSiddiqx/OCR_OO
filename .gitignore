@@ -1,0 +1,56 @@
+# .gitignore — ocr_oo
+
+# ── Python ────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# distribution / packaging
+dist/
+build/
+*.egg-info/
+*.egg
+
+# ── App runtime data ──────────────────────────────────────
+# uploaded files (temp, auto-deleted, never commit)
+backend/uploads/
+# OCR output text files (user data, never commit)
+backend/outputs/
+# SQLite job store if someone adds persistence
+backend/jobs.db
+
+# ── OS ────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# ── Editors ───────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── Logs ─────────────────────────────────────────────────
+*.log
+uvicorn*.log
+
+# ── PyInstaller ───────────────────────────────────────────
+*.spec
+dist/
+build/
+
+# ── Cloudflare / tunnel ───────────────────────────────────
+.cloudflared/
+*.json
+!package.json
